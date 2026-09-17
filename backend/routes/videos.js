@@ -142,32 +142,79 @@ router.get('/stream/:id', (req, res) => {
   }
 })
 
+
 // GET /api/videos - list (supports ?title=)
-
-
-// GET /api/videos/:id
-
-
-// PUT /api/videos/:id/like  { like: true }
-
-
-// PUT /api/videos/:id/comments  { author, text }
-
-
-// GET /api/videos/:id/likes
-
-
-// GET /api/videos/:id/comments
-
+router.get('/', (req, res) => {
+  const videos = readJSON(videosFile) || []
+  const title = req.query.title
+  res.json(title ? videos.filter((v) => v.title.toLowerCase().includes(String(title).toLowerCase())) : videos)
+})
 
 // GET /api/videos/watch-history — Get watch history
-
+router.get('/watch-history', (req, res) => {
+  res.json(readHistory())
+})
 
 // POST /api/videos/watch-history — Add to history
-
+router.post('/watch-history', (req, res) => {
+  const history = readHistory()
+  const { videoId } = req.body || {}
+  if (!videoId) return res.status(400).json({ error: 'videoId required' })
+  const entry = { videoId, watchedAt: new Date().toISOString() }
+  writeHistory([...history.filter((h) => h.videoId !== videoId), entry])
+  res.json(entry)
+})
 
 // DELETE /api/videos/watch-history — Clear history
+router.delete('/watch-history', (req, res) => {
+  writeHistory([])
+  res.json({ ok: true })
+})
 
+// GET /api/videos/:id
+router.get('/:id', (req, res) => {
+  const videos = readJSON(videosFile) || []
+  const video = videos.find((x) => x._id === req.params.id)
+  if (!video) return res.status(404).json({ error: 'Not found' })
+  res.json(video)
+})
+
+// PUT /api/videos/:id/like  { like: true }
+router.put('/:id/like', (req, res) => {
+  const videos = readJSON(videosFile) || []
+  const video = videos.find((x) => x._id === req.params.id)
+  if (!video) return res.status(404).json({ error: 'Not found' })
+  video.likes = Math.max(0, (video.likes || 0) + (req.body.like === false ? -1 : 1))
+  writeJSON(videosFile, videos)
+  res.json({ likes: video.likes })
+})
+
+// PUT /api/videos/:id/comments  { author, text }
+router.put('/:id/comments', (req, res) => {
+  const videos = readJSON(videosFile) || []
+  const video = videos.find((x) => x._id === req.params.id)
+  if (!video) return res.status(404).json({ error: 'Not found' })
+  const comment = { _id: generateId(), author: req.body.author, text: req.body.text, createdAt: new Date().toISOString() }
+  video.comments = [...(video.comments || []), comment]
+  writeJSON(videosFile, videos)
+  res.json(video.comments)
+})
+
+// GET /api/videos/:id/likes
+router.get('/:id/likes', (req, res) => {
+  const videos = readJSON(videosFile) || []
+  const video = videos.find((x) => x._id === req.params.id)
+  if (!video) return res.status(404).json({ error: 'Not found' })
+  res.json({ likes: video.likes || 0 })
+})
+
+// GET /api/videos/:id/comments
+router.get('/:id/comments', (req, res) => {
+  const videos = readJSON(videosFile) || []
+  const video = videos.find((x) => x._id === req.params.id)
+  if (!video) return res.status(404).json({ error: 'Not found' })
+  res.json(video.comments || [])
+})
 
 
 module.exports = router
